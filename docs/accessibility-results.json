@@ -1,0 +1,38 @@
+[
+  {
+    "screen": "Home desktop",
+    "violations": [],
+    "passes": 20,
+    "incomplete": 1
+  },
+  {
+    "screen": "Manual entry dialog",
+    "violations": [],
+    "passes": 15,
+    "incomplete": 1
+  },
+  {
+    "screen": "Customers",
+    "violations": [],
+    "passes": 21,
+    "incomplete": 1
+  },
+  {
+    "screen": "Activity",
+    "violations": [],
+    "passes": 19,
+    "incomplete": 1
+  },
+  {
+    "screen": "Settings dialog",
+    "violations": [],
+    "passes": 13,
+    "incomplete": 1
+  },
+  {
+    "screen": "Home mobile",
+    "violations": [],
+    "passes": 20,
+    "incomplete": 0
+  }
+]

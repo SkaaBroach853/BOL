@@ -1,0 +1,1 @@
+export const formatMoney = (paise: number) => new Intl.NumberFormat('en-IN', {style:'currency', currency:'INR', minimumFractionDigits: paise % 100 ? 2 : 0, maximumFractionDigits: 2}).format(paise / 100);

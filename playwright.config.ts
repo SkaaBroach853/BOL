@@ -1,0 +1,2 @@
+import { defineConfig } from '@playwright/test';
+export default defineConfig({testDir:'./tests/browser',fullyParallel:false,workers:1,timeout:40000,reporter:[['list'],['json',{outputFile:'test-results/browser-results.json'}]],use:{baseURL:'http://127.0.0.1:3101',channel:process.env.BOL_BROWSER_CHANNEL??'msedge',headless:true,viewport:{width:1440,height:1080},trace:'retain-on-failure',screenshot:'only-on-failure'}});
