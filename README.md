@@ -1,107 +1,82 @@
-# BOL · बोल
+# BOL - your local voice ledger
 
-A working Hindi/English credit ledger prototype for a small tea stall. Give credit, review a server-issued preview, explicitly confirm, correct the latest transaction without erasing history, and record repayments. Apple-inspired restraint: warm neutral surfaces, deep teal, readable type, and focused controls.
+BOL now runs its speech model, interpretation agents, customer clarification and financial ledger on your own computer. **No cloud AI API, API key, subscription, or remote inference service.** The earlier cloud adapter was removed at the owner's request.
 
-**Local prototype.** Four clearly fictitious customers start at zero, including two Ramesh customers with distinguishing labels. No transactions are fabricated. Source repository: [BOL](https://github.com/SkaaBroach853/BOL). No public application deployment or submission has been made.
+The interface keeps the Apple-inspired styling, mobile layout, confirmation previews, immutable correction history, customer search, receipts and CSV export.
 
-## Quick start · Windows PowerShell
+## Start here - Windows PowerShell
 
-Prerequisite: Node.js **22.17 or later**, with npm. Tested here on Node 22.17.0 / npm 10.9.2 / Windows. SQLite is bundled with Node; no Python, GPU, database server, or native compiler is needed. Node 22 prints an experimental SQLite warning; the ledger uses the real file-backed SQLite engine.
+Prerequisites: Node 22.17+ and Python 3.13 (tested on 3.13.2). No GPU or separate FFmpeg installation is needed. Use the project directory:
 
 ```powershell
 cd "D:\Downloads\Vibe X Codes\bol"
-npm ci
+npm install --include=dev
+npm run setup:local
 npm run build
 npm start
 ```
 
-Open **http://127.0.0.1:3000**. Keep the terminal running. Stop with Ctrl+C. Commands work from the project directory on macOS/Linux too; replace the `cd` path.
+Open **http://127.0.0.1:3000**. Keep the terminal running. Stop with Ctrl+C. On this development machine the local speech environment and model are already installed, so `npm start` is sufficient after the build.
 
-If Windows reports `'tsx' is not recognized`, dependencies are missing or incomplete. Run `npm install --include=dev`, then `npm run build` and `npm start`. `tsx` is a required runtime dependency and is installed locally; no global installation is needed. Building and testing also require the development dependencies, so do not omit them during setup.
+`setup:local` creates an isolated `.venv`, installs faster-whisper and a compatible audio decoder, and downloads the open multilingual Whisper base model into `models/whisper-base`. This needs internet **once** and disk space for packages and weights. There is no login or key. Model/runtime files are ignored by Git, so a fresh clone must run this setup. Normal runtime loads local files only and sets Hugging Face offline mode. The model runs as CPU int8 and is loaded on the first recording; the first request may be slower.
 
-For development with React hot reload and the API in one process:
+For development use `npm run dev`. If Windows reports `tsx is not recognized`, run `npm install --include=dev` first. `tsx` is a pinned runtime dependency; do not install it globally.
 
-```powershell
-npm run dev
-```
+## What the agents actually are
 
-Default SQLite file: `data/bol.sqlite`. Refreshing or restarting keeps it. Back it up with the server stopped, including any `-wal` / `-shm` files if present. Do not put it on ephemeral serverless storage. Tests use a different database.
+- **Speech agent:** a persistent local Python worker using the real pretrained Whisper base speech model. Audio travels from the browser to your own localhost server, then over process stdin. No cloud transcription.
+- **Interpretation agent:** BOL's inspectable, schema-validated Hindi/English rule code extracts action, customer and rupee amount. It is a bounded rule agent, **not a general-purpose LLM**.
+- **Review agent:** resolves stable customer IDs, asks for missing amount/direction or duplicate names, and produces a canonical server-issued preview.
+- **Ledger:** only your explicit confirmation can commit the proposal, atomically, in SQLite. No agent can bypass this boundary.
 
-## Try it without credentials
+These are your application's agent code and a downloaded open pretrained speech model. BOL does not claim to have trained the speech model from scratch. Whisper's open weights were originally released by OpenAI; using them locally is different from calling an OpenAI API.
 
-1. Enter manually → Credit given → Ramesh · Auto driver → `40` → Review → Confirm & save.
-2. Done → Correct latest transaction → Suresh · Book shop → Preview customer correction → Confirm & save.
-3. Enter manually → Repayment received → Suresh · Book shop → `20` → Review → Confirm & save.
-4. Customers shows Ramesh ₹0 and Suresh ₹20. Activity preserves all four linked events. Refresh to verify persistence.
-5. Expand typed input and enter `Ramesh ko chalis rupaye udhaar likho`: both Ramesh identities are offered; nothing changes until selection and confirmation.
+## Try the working journey
 
-Typed instructions use a **disclosed bounded local rule parser when no key is configured**. It supports common credit/repayment/correction/balance phrases, selected Hindi amount words, transliteration, Hindi digits and decimal digits. Complex or ambiguous input should be completed through the explicit form. This is not speech recognition or an offline LLM. The microphone never returns a sample transcript.
+1. Give Ramesh / Auto driver a credit of 40, review, then confirm.
+2. Correct latest transaction, move it to Suresh / Book shop, review, confirm.
+3. Record Suresh's repayment of 20, review, confirm.
+4. Ramesh owes 0 and Suresh owes 20. Activity preserves the original credit, linked reversal, replacement credit and repayment. Refresh keeps them.
 
-## Real voice setup · optional
+Use the microphone for real local transcription, or the manual form. Typed instructions run through the same local interpretation/review agents. Examples: `Suresh credit 40`, `Suresh ne bees rupaye de diye`, `Nahi Ramesh nahi Suresh`. Two sample Ramesh customers require label selection. `Ramesh ko chalis diye` asks for direction instead of guessing. Vocabulary is deliberately limited: use the form if a phrase is not recognized. Names and amounts must always be reviewed.
 
-Manual entry does not need a key. For real audio transcription and model interpretation, create a local `.env`:
+Four fictitious sample customers start at zero. Settings reset requires typing `RESET DEMO`, archives the prior shop in SQLite and starts a fresh sample shop. There is no archive-browsing UI.
 
-```powershell
-if (!(Test-Path .env)) { Copy-Item .env.example .env }
-notepad .env
-```
-
-Set `OPENAI_API_KEY` to a funded OpenAI API project's key with access to the configured models. Defaults are `OPENAI_TRANSCRIBE_MODEL=gpt-transcribe` and `OPENAI_INTENT_MODEL=gpt-4.1-mini`. Model names are configurable and account access must be checked. Restart the server after changing environment variables. Do not prefix a secret with `VITE_`, commit `.env`, or enter a key into the browser. The health endpoint reports only whether a key exists, never its value. “Configured” does not prove valid credentials or model access.
-
-Tap the microphone deliberately, grant permission, speak Hindi/English, and stop. Recording caps at 20 seconds. The backend sends audio to `/v1/audio/transcriptions`, then sends the transcript and limited last-action context to `/v1/responses` with a strict schema. Check the visible transcript, action, identity, and amount before confirming. All monetary actions still require a tap or keyboard confirmation. An edited transcript is labelled typed input.
-
-No API credentials were available during implementation. **Live transcription, live model interpretation, speech accuracy, voice latency, token/audio usage and cost remain unverified.** Adapter tests use explicitly named mock transports. Browser recorder tests use generated audio only to check lifecycle mechanics. They are not live speech tests.
-
-## Verification commands
+## Verify
 
 ```powershell
 npm test
 npm run build
 npm run test:browser
+npm run test:local
 ```
 
-The browser suite uses installed Microsoft Edge and a separate server on port **3101**, with a separate `data/browser-tests.sqlite` database and cloud credentials disabled. It creates actual-interface screenshots in `docs/screenshots/`. Keep port 3101 free. Build before running it. Browser tests create fresh sample shops in the test database only.
+The first three check domain/API behavior, strict TypeScript/build, and the real Edge interface. Browser tests use port 3101 and a separate SQLite database; they deliberately disable speech to test the missing-model state and recording error handling. Keep 3101 free. Edge is the default; Playwright Chromium can be selected with `BOL_BROWSER_CHANNEL=chromium` after installing it.
 
-If Edge is unavailable, install Playwright Chromium and select it:
+`test:local` additionally checks **actual CPU speech inference through HTTP upload, local agents, preview, and explicit ledger confirmation**. It uses a synthetic English WAV saying "Suresh credit forty rupees." in an in-memory test shop. On Windows it can generate the WAV with offline system TTS. This is a synthetic regression sample, not human Hindi recognition evidence. The audio stays under ignored `data/` and is not uploaded to a service.
 
-```powershell
-npx playwright install chromium
-$env:BOL_BROWSER_CHANNEL = "chromium"
-npm run test:browser
-```
+See [current evidence](docs/VERIFICATION.md) and [local inference observation](docs/local-speech-verification.json). A real local run recognized `Suresh Credit 40 Rupees.` and proposed ADD_CREDIT / 4000 paise. Small sample: no broad accuracy claim.
 
-The test runner starts direct Node children and stops its owned server, avoiding npm/cmd process-tree teardown issues observed on this Windows host. Automated accessibility checks use axe, alongside keyboard and viewport checks. Passing automation does not replace real assistive-technology or physical-device testing. See [verification evidence](docs/VERIFICATION.md).
+## Financial correctness and persistence
 
-## Financial and recovery rules
+Money uses integer paise, exact decimal-string parsing, positive amounts, two-decimal precision and a configurable default 10,000-rupee entry limit. Repayment above current outstanding is rejected. Balances are derived from immutable ledger events, never model output.
 
-- Money is integer paise; strict decimal-string parsing. Positive amounts only, maximum two decimals, default limit ₹10,000 per entry. Overpayments are rejected.
-- A preview alone never writes money. Confirmation submits only a stored proposal ID and a persisted client operation ID. Proposals expire after five minutes.
-- SQLite transactions, foreign keys, a unique operation key and canonical-payload hash prevent duplicate economic effects. Identical retries return the original receipt. Changed requests cannot reuse an operation ID.
-- The browser persists an operation ID before sending confirmation. If the response is lost, it displays an unknown result and offers receipt lookup / retry with the same ID. Refresh also checks for the saved receipt. Browser storage must be available for confirmation.
-- Only the latest eligible ledger event can be reversed; only the latest credit can move to another customer. Correction appends a linked reversal and replacement atomically. Older or already reversed targets are refused. Earlier history is never edited/deleted.
-- Customer search uses stable IDs and distinguishing labels. Duplicate names require explicit selection.
-- Demo reset is guarded by `RESET DEMO` in Settings. It archives the old shop and creates a fresh one; original ledger events remain in SQLite. This prototype has no archive-browsing UI.
+Every financial confirmation uses a stored expiring proposal and a client operation ID persisted before sending. Identical retries recover the original receipt; changed requests cannot reuse an operation. Corrections atomically append linked reversal/replacement events. Only the latest eligible transaction can be corrected. A dropped response stays "unknown" until receipt lookup or retry resolves it.
 
-## Network, privacy and deployment boundary
+The authoritative database is `data/bol.sqlite`, automatically created by Node's bundled SQLite engine. Node 22 emits an experimental API warning. Refresh/server restart preserve the file. Stop the server before backing it up. Model files, databases, `.venv`, credentials and caches are excluded from Git.
 
-The server binds only to loopback. It validates localhost hosts, same-origin mutations and a server-session CSRF token, limits requests and recording sizes, and uses parameterized SQL. This is a single local demo without user accounts. Do not tunnel it publicly or describe it as a secure hosted app. Public deployment needs authentication, isolated shops, TLS, durable storage, and another security review.
+## Privacy and limitations
 
-If external internet goes away while the local server is still running, manual entry can work from the loaded app; cloud voice cannot. An actual external-network disconnection rehearsal has **not** been performed. If the local server is unreachable, current loaded records remain visible and labelled as such; drafts are not counted in authoritative balances. Manual draft fields survive refresh in browser storage. There is no service worker, installable PWA, offline page reload, or distributed sync.
+After the one-time download, local inference has no cloud dependency. Keep the Node server and Python worker available; stopping the local server prevents authoritative writes. No service worker, offline page reload, remote sync, public authentication or hosted deployment is provided. Audio is decoded in memory and discarded after processing; transcripts are not stored in the ledger. Manual drafts and pending operation IDs use browser local storage. Recording caps at 20 seconds; the local decoder also rejects overlong decoded audio.
 
-Raw audio is not written to disk; transcripts are not stored in the ledger or logs. They remain temporarily in the browser and request memory. Manual drafts, customer-create retry details and pending confirmation IDs are kept in local storage. With voice configured, audio and transcripts leave the computer for OpenAI. `store:false` is sent for Responses; this is not a zero-retention guarantee. Provider/account policies apply; see [architecture and privacy](docs/ARCHITECTURE.md).
+Whisper base can mishear Hindi, names, mixed-language speech and noisy audio. Human Hindi recordings, physical Android Chrome, street noise and actual OS microphone permission prompts remain unverified. Real local inference was verified with one synthetic English sample; the rule parser has a separate 26-case typed regression set. The interface is English-first with Hindi cues and Devanagari fallback fonts. It is a single-computer demo without bank/UPI/WhatsApp integrations. Public deployment still needs authentication, isolated shops, TLS and durable storage.
 
-## Current limitations
+## Repository and documents
 
-Tested interface: installed desktop Microsoft Edge, headless, and 360px responsive/short-height viewport emulation. Physical Android Chrome, desktop Chrome/Safari, screen-reader use, actual software keyboard, street noise, regional dialects and live voice remain untested. The interface primarily uses English action labels with Hindi cues and Devanagari fallback fonts; it is not a fully localized Hindi UI.
-
-The app is intentionally small: one active local sample shop, no authentication, no bank/UPI/WhatsApp integration, no remote sync, no voice-only confirmation, no customer editing/deletion, and no automated reconciliation of older transactions. The typed rule parser is limited, and cloud interpretations can be wrong: always review. Recording length is capped in the browser; the server enforces MIME/header and 5 MiB limits, not adversarial media-duration decoding. System fonts are used without remote font requests. CSV exports escape fields and neutralize spreadsheet-formula prefixes.
-
-## Repository guide
-
-`client/` React interface and microphone lifecycle; `server/` API, provider, deterministic ledger and SQLite wrapper; `shared/` boundary schemas/types; `tests/` domain/API, typed evaluation and real-browser checks.
+[Source repository](https://github.com/SkaaBroach853/BOL)
 
 - [Architecture](docs/ARCHITECTURE.md)
-- [Demo script · 2:45](docs/DEMO_SCRIPT.md)
+- [Demo script](docs/DEMO_SCRIPT.md)
 - [Submission outline](docs/SUBMISSION_OUTLINE.md)
-- [Verification report](docs/VERIFICATION.md)
-- [AI and resource disclosure](docs/AI_USAGE.md)
+- [Verification](docs/VERIFICATION.md)
+- [AI / resource disclosure](docs/AI_USAGE.md)

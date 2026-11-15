@@ -27,7 +27,7 @@ test('manual central journey, linked correction, refresh, customer receipt and C
   expect(errors).toEqual([]);writeFileSync('docs/browser-timings.json',JSON.stringify({metric:'UI confirmation click to visible saved receipt',environment:'Headless installed Microsoft Edge / Windows / localhost',observationsMs:timings,liveProvider:false},null,2));
 });
 test('typed duplicate name clarification, cancellation and accurate setup state',async({page})=>{
-  await page.getByRole('button',{name:'Start voice recording'}).click();await expect(page.getByRole('alert')).toContainText('Voice needs a server-side OpenAI API key');
+  await page.getByRole('button',{name:'Start voice recording'}).click();await expect(page.getByRole('alert')).toContainText('Install the local speech model');
   await page.getByText('Type a Hindi or English instruction',{exact:true}).click();await page.getByLabel('Typed input',{exact:true}).fill('Ramesh ko chalis rupaye udhaar likho');await page.getByRole('button',{name:'Review typed instruction'}).click();
   await expect(page.getByRole('heading',{name:'Let’s get this right.'})).toBeVisible();await expect(page.getByText('More than one customer matches. Choose the distinguishing label.')).toBeVisible();await expect(page.locator('.outstanding-value')).toHaveText('₹0');
   await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:'docs/screenshots/05-clarification.png',fullPage:true});
@@ -79,6 +79,6 @@ test('20-second recorder cap stops tracks; real unconfigured API fails without a
   await page.route('**/api/health',async route=>{const r=await route.fetch();await route.fulfill({response:r,json:{...await r.json(),voiceConfigured:true}});});
   await page.addInitScript(()=>{Object.defineProperty(navigator.mediaDevices,'getUserMedia',{value:async()=>{const audio=new AudioContext();const dest=audio.createMediaStreamDestination();(window as any).__bolTestStream=dest.stream;return dest.stream;}});});
   await page.reload();await page.getByRole('button',{name:'Start voice recording'}).click();await expect(page.getByRole('button',{name:'Stop recording'})).toBeVisible();
-  await expect(page.getByRole('alert')).toContainText('OPENAI_API_KEY',{timeout:27000});
+  await expect(page.getByRole('alert')).toContainText('npm run setup:local',{timeout:27000});
   expect(await page.evaluate(()=>(window as any).__bolTestStream.getTracks().every((t:MediaStreamTrack)=>t.readyState==='ended'))).toBe(true);await expect(page.locator('.outstanding-value')).toHaveText('₹0');await expect(page.getByRole('button',{name:'Confirm & save'})).toHaveCount(0);
 });

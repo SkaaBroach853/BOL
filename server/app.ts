@@ -4,10 +4,11 @@ import { z } from 'zod';
 import { idSchema } from '../shared/contracts.ts';
 import { Ledger } from './ledger.ts';
 import { DomainError } from './money.ts';
-import { localIntent, resolveIntent } from './interpreter.ts';
-import { OpenAIProvider } from './provider.ts';
+import { LedgerAgents } from './agents.ts';
+import type { SpeechEngine } from './local-speech.ts';
 
-export function createApp(ledger:Ledger,provider:OpenAIProvider) {
+export function createApp(ledger:Ledger,provider:SpeechEngine) {
+  const agents=new LedgerAgents(ledger);
   const app=express(),csrfToken=randomBytes(32).toString('hex');
   app.disable('x-powered-by');
   app.use((req,res,next)=>{
@@ -30,7 +31,7 @@ export function createApp(ledger:Ledger,provider:OpenAIProvider) {
     next();
   });
   app.use(express.json({limit:'16kb'}));
-  app.get('/api/health',(_req,res)=>res.json({ok:true,voiceConfigured:provider.configured,provider:'OpenAI',transcriptionModel:provider.config.transcriptionModel,intentModel:provider.config.intentModel,entryLimit:ledger.limit,shopId:ledger.shopId,shopName:'Corner Chai',csrfToken,mode:'local'}));
+  app.get('/api/health',(_req,res)=>res.json({ok:true,voiceConfigured:provider.configured,provider:provider.name,transcriptionModel:provider.config.transcriptionModel,intentModel:provider.config.intentModel,entryLimit:ledger.limit,shopId:ledger.shopId,shopName:'Corner Chai',csrfToken,mode:'local',cloudRequests:false}));
   app.get('/api/snapshot',(_req,res)=>res.json(ledger.snapshot()));
   app.get('/api/customers',(_req,res)=>res.json(ledger.customers()));
   app.post('/api/customers',(req,res)=>{
@@ -52,7 +53,7 @@ export function createApp(ledger:Ledger,provider:OpenAIProvider) {
     if(!valid) throw new DomainError('INVALID_AUDIO','The audio contents do not match the recording format.',415);
     const controller=new AbortController();res.on('close',()=>{if(!res.writableEnded) controller.abort();});
     const start=performance.now(),transcript=await provider.transcribe(bytes,mime,controller.signal);
-    res.json({transcript,elapsedMs:Math.round(performance.now()-start),source:'live-provider'});
+    res.json({transcript,elapsedMs:Math.round(performance.now()-start),source:'local-whisper'});
   });
   app.post('/api/interpret',async(req,res)=>{
     const b=z.object({transcript:z.string().trim().min(1).max(2000),targetId:idSchema.nullable(),inputType:z.enum(['typed','voice'])}).strict().parse(req.body);
@@ -61,10 +62,9 @@ export function createApp(ledger:Ledger,provider:OpenAIProvider) {
     // The client carries the last ledger action seen when the request began; a stale target never advances automatically.
     if(b.targetId&&target?.id!==b.targetId) throw new DomainError('STALE_TARGET','The ledger changed. Refresh and review the latest entry.',409);
     if(b.inputType==='voice'&&!provider.configured) throw new DomainError('VOICE_NOT_CONFIGURED','Voice is not configured. Use manual or typed input.',503);
-    const start=performance.now(),source=provider.configured?'OpenAI interpretation':'Typed input · local rules';
-    const intent=provider.configured?await provider.interpret(b.transcript,target&&b.targetId?{id:target.id,type:target.type,name:target.name,amountPaise:target.amount}:null,controller.signal):localIntent(b.transcript,ledger);
+    const start=performance.now();
     if(controller.signal.aborted) return;
-    res.json({...resolveIntent(intent,ledger,b.targetId,source),elapsedMs:Math.round(performance.now()-start)});
+    res.json({...agents.run(b.transcript,b.targetId,b.inputType),elapsedMs:Math.round(performance.now()-start)});
   });
   app.use('/api',(_req,res)=>res.status(404).json({code:'NOT_FOUND',message:'API route not found.'}));
   const errors:ErrorRequestHandler=(error,_req,res,_next)=>{

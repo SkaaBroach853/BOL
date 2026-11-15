@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-15T14:06:41.460Z",
+  "engine": "faster-whisper 1.2.1 / Whisper base / CPU int8",
+  "input": "Windows offline system TTS, synthetic English speech; not a human Hindi sample",
+  "spokenText": "Suresh credit forty rupees.",
+  "observedTranscript": "Suresh Credit 40 Rupees.",
+  "observedAction": "ADD_CREDIT",
+  "observedAmountPaise": 4000,
+  "stopToPreviewEquivalentMs": 23163,
+  "cloudRequests": false,
+  "assertions": "HTTP upload → real local transcription → local agents → preview has zero balance effect → explicit confirmation saves ₹40",
+  "sampleSize": 1
+}
