@@ -17,6 +17,8 @@ npm start
 
 Open **http://127.0.0.1:3000**. Keep the terminal running. Stop with Ctrl+C. Commands work from the project directory on macOS/Linux too; replace the `cd` path.
 
+If Windows reports `'tsx' is not recognized`, dependencies are missing or incomplete. Run `npm install --include=dev`, then `npm run build` and `npm start`. `tsx` is a required runtime dependency and is installed locally; no global installation is needed. Building and testing also require the development dependencies, so do not omit them during setup.
+
 For development with React hot reload and the API in one process:
 
 ```powershell
