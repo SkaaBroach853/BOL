@@ -1,0 +1,43 @@
+{
+  "date": "2026-11-17T04:28:43.253Z",
+  "browser": "Installed Microsoft Edge headless / Windows",
+  "engine": "faster-whisper / base / CPU int8",
+  "input": "Four Windows offline TTS English clips fed through real AudioContext streams and MediaRecorder; not human speech",
+  "mockedAPI": false,
+  "firstTranscript": "Suresh Credit 40 Rupees",
+  "observations": [
+    {
+      "transcript": "Suresh Credit 40 Rupees",
+      "elapsedMs": 15787,
+      "source": "local-whisper"
+    },
+    {
+      "transcript": "Listen again.",
+      "elapsedMs": 3886,
+      "source": "local-whisper"
+    },
+    {
+      "transcript": "Suresh Credit 40 Rupees",
+      "elapsedMs": 4874,
+      "source": "local-whisper"
+    },
+    {
+      "transcript": "Confirm",
+      "elapsedMs": 4885,
+      "source": "local-whisper"
+    }
+  ],
+  "assertions": [
+    "Actual waveform becomes active from audio samples",
+    "Recording stops after detected pause",
+    "Real ASR generates credit preview, ledger remains zero",
+    "Real spoken Listen again cancels and starts new capture without saving",
+    "Second credit preview followed by real spoken Confirm saves once",
+    "Final ledger exactly 4000 paise, one event"
+  ],
+  "limitations": [
+    "Human Hindi and noise unverified",
+    "Microphone hardware and OS permission prompt not exercised",
+    "No claim of universal phrase recognition"
+  ]
+}

@@ -4,6 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { actionSchema, type Action, type Customer, type Entry, type Proposal, type Receipt, type Snapshot } from '../shared/contracts.ts';
 import { DomainError, parseMoney } from './money.ts';
+import {normalizePhone} from '../shared/contacts.ts';
 
 type Canonical = { action: Action['action']; customerId: string; amount: number; targetId?: string; head?: number };
 type ProposalRow = { id:string; shopId:string; payload:string; expiresAt:string; state:string };
@@ -32,6 +33,7 @@ export class Ledger {
       CREATE TRIGGER IF NOT EXISTS ledger_no_update BEFORE UPDATE ON ledger_entries BEGIN SELECT RAISE(ABORT,'Immutable ledger'); END;
       CREATE TRIGGER IF NOT EXISTS ledger_no_delete BEFORE DELETE ON ledger_entries BEGIN SELECT RAISE(ABORT,'Immutable ledger'); END;
     `);
+    if(!(this.db.prepare('PRAGMA table_info(customers)').all() as {name:string}[]).some(c=>c.name==='phone'))this.db.exec("ALTER TABLE customers ADD COLUMN phone TEXT NOT NULL DEFAULT ''");
     this.db.transaction(()=>{ if(!this.db.prepare("SELECT value FROM meta WHERE key='shop'").get()) this.newDemoShop(); })();
   }
   get shopId():string { return (this.db.prepare("SELECT value FROM meta WHERE key='shop'").get() as {value:string}).value; }
@@ -39,27 +41,34 @@ export class Ledger {
     const id=randomUUID();
     this.db.prepare('INSERT INTO shops VALUES(?,?,?)').run(id,'Corner Chai',now());
     this.db.prepare("INSERT INTO meta VALUES('shop',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(id);
-    const insert=this.db.prepare('INSERT INTO customers VALUES(?,?,?,?,?,?)');
+    const insert=this.db.prepare('INSERT INTO customers(id,shopId,name,label,aliases,createdAt) VALUES(?,?,?,?,?,?)');
     for(const [name,label,aliases] of [['Ramesh','Auto driver','रमेश'],['Suresh','Book shop','सुरेश'],['Meena','Flower stall','मीना'],['Ramesh','Electrician','रमेश']]) insert.run(randomUUID(),id,name,label,aliases,now());
     return id;
   }
   reset(phrase:string) { if(phrase!=='RESET DEMO') fail('RESET_PHRASE','Type RESET DEMO to create a fresh sample shop.',400); return this.db.transaction(()=>this.newDemoShop()).immediate(); }
   customers():Customer[] {
-    return this.db.prepare(`SELECT c.id,c.name,c.label,c.aliases,COALESCE(SUM(e.delta),0) balance FROM customers c LEFT JOIN ledger_entries e ON e.customerId=c.id AND e.shopId=c.shopId WHERE c.shopId=? GROUP BY c.id ORDER BY c.name,c.label`).all(this.shopId) as Customer[];
+    return this.db.prepare(`SELECT c.id,c.name,c.label,c.aliases,c.phone,COALESCE(SUM(e.delta),0) balance FROM customers c LEFT JOIN ledger_entries e ON e.customerId=c.id AND e.shopId=c.shopId WHERE c.shopId=? GROUP BY c.id ORDER BY c.name,c.label`).all(this.shopId) as Customer[];
   }
   customer(id:string):Customer { return this.customers().find(c=>c.id===id) ?? fail('CUSTOMER_NOT_FOUND','Choose a customer in this shop.',404); }
   resolve(query:string):Customer[] {
     const q=normalize(query); if(!q) return [];
     return this.customers().filter(c=>[c.name,...c.aliases.split('|'),c.name+' '+c.label].some(n=>normalize(n)===q));
   }
-  addCustomer(name:string,label:string,operationId:string):Customer {
+  addCustomer(name:string,label:string,operationId:string,phone=''):Customer {
     return this.db.transaction(()=>{
-      const payload=JSON.stringify({name:normalize(name),label:normalize(label)});
+      const normalizedPhone=normalizePhone(phone);
+      const payload=JSON.stringify({name:normalize(name),label:normalize(label),...(normalizedPhone?{phone:normalizedPhone}:{})});
       const existing=this.recover(operationId,payload); if(existing) return existing as unknown as Customer;
-      const customer={id:randomUUID(),name:name.trim(),label:label.trim(),aliases:'',balance:0};
-      this.db.prepare('INSERT INTO customers VALUES(?,?,?,?,?,?)').run(customer.id,this.shopId,customer.name,customer.label,'',now());
+      const customer={id:randomUUID(),name:name.trim(),label:label.trim(),aliases:'',balance:0,phone:normalizedPhone};
+      this.db.prepare('INSERT INTO customers(id,shopId,name,label,aliases,createdAt,phone) VALUES(?,?,?,?,?,?,?)').run(customer.id,this.shopId,customer.name,customer.label,'',now(),normalizedPhone);
       this.db.prepare('INSERT INTO operations VALUES(?,?,?,?)').run(operationId,this.shopId,hash(payload),JSON.stringify(customer)); return customer;
     }).immediate();
+  }
+  updatePhone(id:string,phone:string):Customer {
+    this.customer(id);
+    const normalized=normalizePhone(phone);
+    this.db.prepare('UPDATE customers SET phone=? WHERE id=? AND shopId=?').run(normalized,id,this.shopId);
+    return this.customer(id);
   }
   entries(customerId?:string):Entry[] {
     return this.db.prepare(`SELECT e.*,c.name,c.label FROM ledger_entries e JOIN customers c ON c.id=e.customerId WHERE e.shopId=? ${customerId?'AND e.customerId=?':''} ORDER BY e.seq DESC`).all(...(customerId?[this.shopId,customerId]:[this.shopId])) as Entry[];

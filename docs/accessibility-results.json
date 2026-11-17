@@ -2,7 +2,7 @@
   {
     "screen": "Home desktop",
     "violations": [],
-    "passes": 20,
+    "passes": 25,
     "incomplete": 1
   },
   {
@@ -15,24 +15,30 @@
     "screen": "Customers",
     "violations": [],
     "passes": 21,
-    "incomplete": 1
+    "incomplete": 0
   },
   {
     "screen": "Activity",
     "violations": [],
     "passes": 19,
-    "incomplete": 1
+    "incomplete": 0
+  },
+  {
+    "screen": "Dashboard",
+    "violations": [],
+    "passes": 21,
+    "incomplete": 0
   },
   {
     "screen": "Settings dialog",
     "violations": [],
     "passes": 13,
-    "incomplete": 1
+    "incomplete": 0
   },
   {
     "screen": "Home mobile",
     "violations": [],
-    "passes": 20,
-    "incomplete": 0
+    "passes": 25,
+    "incomplete": 1
   }
 ]

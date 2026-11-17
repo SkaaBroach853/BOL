@@ -18,7 +18,7 @@ export const intentSchema = z.discriminatedUnion('intent', [
   z.object({ intent: z.literal('UNSUPPORTED'), ...fields }).strict(),
 ]);
 export type Intent = z.infer<typeof intentSchema>;
-export type Customer = { id: string; name: string; label: string; aliases: string; balance: number };
+export type Customer = { id: string; name: string; label: string; aliases: string; balance: number; phone?: string };
 export type Entry = { seq: number; id: string; customerId: string; name: string; label: string; type: 'CREDIT'|'REPAYMENT'|'REVERSAL'; amount: number; delta: number; relatedId: string|null; operationId: string; createdAt: string };
 export type Proposal = { id: string; action: Action['action']; customerId: string; name: string; label: string; amount: number; before: number; after: number; targetId?: string; originalName?: string; originalLabel?: string; originalBefore?: number; originalAfter?: number; expiresAt: string; state: string };
 export type Receipt = { id: string; operationId: string; action: string; createdAt: string; entries: Entry[]; balances: {customerId:string; name:string; balance:number}[]; proposalId?: string };

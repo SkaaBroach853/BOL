@@ -28,6 +28,9 @@ test('HTTP confirmation, concurrent retries, schema boundary and origin protecti
     const r=await fetch(base+'/api/transcribe',{method:'POST',headers:{'Content-Type':'audio/webm','x-bol-csrf':h.csrfToken},body:audio});assert.equal(r.status,503);assert.equal((await r.json()).code,'VOICE_NOT_CONFIGURED');
     assert.equal((await fetch(base+'/api/transcribe',{method:'POST',headers:{'Content-Type':'text/plain','x-bol-csrf':h.csrfToken},body:'fake audio'})).status,415);
     const saved=await(await fetch(base+'/api/operations/'+operationId)).json();assert.equal(saved.id,results[0].id);
+    const added=await(await post('/customers',{name:'Kavita',label:'Tailor',phone:'9876543210',operationId:randomUUID()})).json();assert.equal(added.phone,'919876543210');
+    assert.equal((await post('/customers/'+added.id+'/phone',{phone:'abc'})).status,400);
+    const updated=await(await post('/customers/'+added.id+'/phone',{phone:'+91 98765 43211'})).json();assert.equal(updated.phone,'919876543211');assert.equal(updated.balance,0);assert.equal(ledger.entries().length,1);
   }finally{await new Promise<void>(r=>server.close(()=>r()));ledger.close();}
 });
 test('local speech has an honest missing-model error without network fallback',async()=>{

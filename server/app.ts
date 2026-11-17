@@ -6,6 +6,8 @@ import { Ledger } from './ledger.ts';
 import { DomainError } from './money.ts';
 import { LedgerAgents } from './agents.ts';
 import type { SpeechEngine } from './local-speech.ts';
+import {normalizePhone} from '../shared/contacts.ts';
+const phoneSchema=z.string().max(30).transform((value,ctx)=>{try{return normalizePhone(value);}catch(e){ctx.addIssue({code:'custom',message:(e as Error).message});return z.NEVER;}});
 
 export function createApp(ledger:Ledger,provider:SpeechEngine) {
   const agents=new LedgerAgents(ledger);
@@ -35,9 +37,10 @@ export function createApp(ledger:Ledger,provider:SpeechEngine) {
   app.get('/api/snapshot',(_req,res)=>res.json(ledger.snapshot()));
   app.get('/api/customers',(_req,res)=>res.json(ledger.customers()));
   app.post('/api/customers',(req,res)=>{
-    const b=z.object({name:z.string().trim().min(1).max(80),label:z.string().trim().max(80),operationId:idSchema}).strict().parse(req.body);
-    res.status(201).json(ledger.addCustomer(b.name,b.label,b.operationId));
+    const b=z.object({name:z.string().trim().min(1).max(80),label:z.string().trim().max(80),operationId:idSchema,phone:phoneSchema.optional()}).strict().parse(req.body);
+    res.status(201).json(ledger.addCustomer(b.name,b.label,b.operationId,b.phone));
   });
+  app.post('/api/customers/:id/phone',(req,res)=>{const b=z.object({phone:phoneSchema}).strict().parse(req.body);res.json(ledger.updatePhone(idSchema.parse(req.params.id),b.phone));});
   app.get('/api/customers/:id/ledger',(req,res)=>{const id=idSchema.parse(req.params.id);res.json({customer:ledger.customer(id),entries:ledger.entries(id)});});
   app.get('/api/activity',(_req,res)=>res.json(ledger.entries()));
   app.post('/api/proposals',(req,res)=>res.status(201).json(ledger.propose(req.body)));

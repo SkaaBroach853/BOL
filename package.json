@@ -14,7 +14,8 @@
     "start": "tsx server/index.ts --production",
     "test": "tsx --test tests/*.test.ts",
     "test:browser": "node scripts/browser-test.mjs",
-    "verify": "npm test && npm run build"
+    "verify": "npm test && npm run build",
+    "test:voice-ui": "tsx scripts/verify-voice-ui.ts"
   },
   "dependencies": {
     "dotenv": "17.2.3",

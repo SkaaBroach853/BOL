@@ -82,3 +82,36 @@ test('20-second recorder cap stops tracks; real unconfigured API fails without a
   await expect(page.getByRole('alert')).toContainText('npm run setup:local',{timeout:27000});
   expect(await page.evaluate(()=>(window as any).__bolTestStream.getTracks().every((t:MediaStreamTrack)=>t.readyState==='ended'))).toBe(true);await expect(page.locator('.outstanding-value')).toHaveText('₹0');await expect(page.getByRole('button',{name:'Confirm & save'})).toHaveCount(0);
 });
+
+test('owner Hinglish payment and remaining balance question stay one reviewed transaction',async({page})=>{
+  await manual(page,'Meena · Flower stall','1000');await confirm(page);
+  await page.getByText('Type a Hindi or English instruction',{exact:true}).click();await page.getByLabel('Typed input',{exact:true}).fill('meena ne 200 dediye mujhe batao kitna bacha hai');await page.getByRole('button',{name:'Review typed instruction'}).click();
+  await expect(page.getByRole('heading',{name:'Repayment received',exact:true})).toBeVisible();await expect(page.locator('.balance-preview')).toContainText('₹800');await expect(page.locator('.outstanding-value')).toHaveText('₹1,000');await confirm(page);await expect(page.locator('.outstanding-value')).toHaveText('₹800');
+  if(!await page.getByLabel('Typed input',{exact:true}).isVisible())await page.getByText('Type a Hindi or English instruction',{exact:true}).click();await page.getByLabel('Typed input',{exact:true}).fill('meena ke isme 500 rupay udhar hai');await page.getByRole('button',{name:'Review typed instruction'}).click();await expect(page.getByText(/Is this a new credit to add/)).toBeVisible();await page.getByLabel('Transaction type').selectOption('SHOW_BALANCE');await page.getByRole('button',{name:'View balance',exact:true}).click();await expect(page.locator('.alert.info')).toContainText('₹800 outstanding');await expect(page.locator('.outstanding-value')).toHaveText('₹800');
+});
+
+test('offline shell reload, durable local draft and reviewed sync have one economic effect',async({page,context,request})=>{
+  await page.evaluate(()=>navigator.serviceWorker.ready.then(()=>true));await page.reload();await expect(page.getByText('Local ledger connected',{exact:true})).toBeVisible();
+  await context.setOffline(true);await expect(page.getByText('Server disconnected',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Enter manually',exact:true}).click();const dialog=page.getByRole('dialog',{name:'New ledger entry'});await dialog.getByLabel('Customer',{exact:true}).selectOption({label:'Meena · Flower stall'});await dialog.getByLabel('Amount in rupees',{exact:true}).fill('125.50');await dialog.getByRole('button',{name:'Save on this device'}).click();
+  await expect(page.getByRole('region',{name:'Entries saved on this device'})).toContainText('₹125.50');await expect(page.locator('.outstanding-value')).toHaveText('₹0');
+  await page.reload();await expect(page.getByRole('region',{name:'Entries saved on this device'})).toContainText('₹125.50');await expect(page.locator('.outstanding-value')).toHaveText('₹0');
+  expect((await(await request.get('/api/snapshot')).json()).total).toBe(0);
+  await context.setOffline(false);await expect(page.getByText('Local ledger connected',{exact:true})).toBeVisible();await page.getByRole('button',{name:'Review & sync'}).click();await expect(page.getByRole('heading',{name:'Credit added',exact:true})).toBeVisible();await expect(page.locator('.outstanding-value')).toHaveText('₹0');await confirm(page);
+  await expect(page.getByRole('region',{name:'Entries saved on this device'})).toHaveCount(0);await page.reload();await expect(page.locator('.outstanding-value')).toHaveText('₹125.50');expect((await(await request.get('/api/activity')).json()).length).toBe(1);
+});
+
+test('pending dashboard stores a phone number and prepares a real WhatsApp link without claiming delivery',async({page})=>{
+  await manual(page,'Meena · Flower stall','500');await confirm(page);
+  await page.getByRole('navigation',{name:'Main navigation',exact:true}).getByRole('button',{name:'Dashboard'}).click();await expect(page.getByRole('heading',{name:'Who still has a balance?'})).toBeVisible();await expect(page.locator('.due-amount')).toHaveText('₹500');
+  await page.getByRole('button',{name:'Add number',exact:true}).click();const dialog=page.getByRole('dialog',{name:'WhatsApp number for Meena'});await dialog.getByLabel('Phone number').fill('123');await dialog.getByRole('button',{name:'Save number'}).click();await expect(dialog.getByRole('alert')).toContainText('valid phone');await dialog.getByLabel('Phone number').fill('9876543210');await dialog.getByRole('button',{name:'Save number'}).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);const href=await page.getByRole('link',{name:'Remind',exact:false}).getAttribute('href');expect(href).toContain('https://wa.me/919876543210?text=');expect(new URL(href!).searchParams.get('text')).toContain('₹500');
+  await page.screenshot({path:'docs/screenshots/studio-pending-dashboard.png',fullPage:true});await page.reload();await page.getByRole('navigation',{name:'Main navigation',exact:true}).getByRole('button',{name:'Dashboard'}).click();await expect(page.getByRole('button',{name:'+919876543210'})).toBeVisible();
+});
+
+test('actual microphone energy changes the orb and pause detection ends recording',async({page})=>{
+  // Real generated oscillator audio, real recorder, real missing-model API response. No ASR claim.
+  await page.route('**/api/health',async route=>{const r=await route.fetch();await route.fulfill({response:r,json:{...await r.json(),voiceConfigured:true}});});
+  await page.addInitScript(()=>{Object.defineProperty(navigator.mediaDevices,'getUserMedia',{value:async()=>{const audio=new AudioContext();await audio.resume();const dest=audio.createMediaStreamDestination(),source=audio.createOscillator();source.connect(dest);source.start();source.stop(audio.currentTime+2);(window as any).__bolTestStream=dest.stream;return dest.stream;}});});
+  await page.reload();await page.getByRole('button',{name:'Start voice recording'}).click();await expect(page.locator('canvas[data-signal="active"]')).toBeVisible();await expect(page.getByRole('alert')).toContainText('npm run setup:local',{timeout:10000});expect(await page.evaluate(()=>(window as any).__bolTestStream.getTracks().every((t:MediaStreamTrack)=>t.readyState==='ended'))).toBe(true);await expect(page.locator('.outstanding-value')).toHaveText('₹0');
+});

@@ -2,9 +2,9 @@
   "metric": "UI confirmation click to visible saved receipt",
   "environment": "Headless installed Microsoft Edge / Windows / localhost",
   "observationsMs": [
+    120,
     118,
-    163,
-    90
+    102
   ],
   "liveProvider": false
 }
